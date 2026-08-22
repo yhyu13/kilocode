@@ -17,6 +17,7 @@ import PROMPT_DEBUG from "../../agent/prompt/debug.txt"
 import PROMPT_ORCHESTRATOR from "../../agent/prompt/orchestrator.txt"
 import PROMPT_ASK from "../../agent/prompt/ask.txt"
 import PROMPT_EXPLORE from "../../agent/prompt/explore.txt"
+import PROMPT_GOAL from "../goal/agent.txt"
 
 export const bash: Record<string, "allow" | "ask" | "deny"> = {
   "*": "ask",
@@ -641,6 +642,28 @@ export function patchAgents(
       baseline(guard, user, kilo.mcpRules),
       askEditGuard(),
       denies(user),
+    ),
+    mode: "primary",
+    native: true,
+  }
+
+  // Add goal agent (kilo-owned autonomous goal harness)
+  agents.goal = {
+    name: "goal",
+    description:
+      "Pursue one durable, long-running objective until it is genuinely complete, continuing across autonomous goal rounds with evidence-first completion.",
+    prompt: PROMPT_GOAL,
+    options: {},
+    permission: Permission.merge(
+      defaults,
+      Permission.fromConfig({
+        get_goal: "allow",
+        create_goal: "allow",
+        update_goal: "allow",
+        todoread: "allow",
+        todowrite: "allow",
+      }),
+      user,
     ),
     mode: "primary",
     native: true,

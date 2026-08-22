@@ -12,6 +12,7 @@ import { apply as applyOverride, type Override } from "@/kilocode/command/overri
 import PROMPT_INITIALIZE from "./template/initialize.txt"
 import { LegacyEvent } from "@opencode-ai/schema/legacy-event"
 import { SessionResume } from "@/kilocode/session-resume" // kilocode_change
+import { goalCommand } from "@/kilocode/goal/command" // kilocode_change
 
 type State = {
   commands: Record<string, Info>
@@ -117,6 +118,7 @@ const layer = Layer.effect(
       commands[Default.REVIEW] = reviewCommand()
       commands["resume-claude"] = SessionResume.resumeClaude
       commands["resume-codex"] = SessionResume.resumeCodex
+      commands["goal"] = goalCommand() // kilocode_change
       // kilocode_change end
 
       // kilocode_change start - defer partial overrides until all command sources are registered

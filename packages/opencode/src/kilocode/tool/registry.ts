@@ -23,6 +23,7 @@ import * as Truncate from "@/tool/truncate"
 import { InstanceState } from "@/effect/instance-state"
 import { KiloMemory } from "@kilocode/kilo-memory/effect"
 import { MemoryPaths } from "@kilocode/kilo-memory/effect/paths"
+import { GetGoalTool, CreateGoalTool, UpdateGoalTool } from "@/kilocode/goal/tool" // kilocode_change
 
 const log = Log.create({ service: "kilocode-tool-registry" })
 type Deps = { agent: Agent.Interface; truncate: Truncate.Interface; indexing?: boolean }
@@ -82,14 +83,17 @@ export namespace KiloToolRegistry {
       const sessions = yield* KiloSessions.Service
       const notify = yield* NotifyUserTool.pipe(Effect.provideService(KiloSessions.Service, sessions))
       const send = yield* SendFileTool
+      const getGoal = yield* GetGoalTool
+      const createGoal = yield* CreateGoalTool
+      const updateGoal = yield* UpdateGoalTool
       if (!notebook)
-        return { recall, managerModels, memory, save, manager, process, chart, image, terminal, notify, send }
+        return { recall, managerModels, memory, save, manager, process, chart, image, terminal, notify, send, getGoal, createGoal, updateGoal }
       const tools = yield* Effect.all({
         notebookRead: NotebookReadTool,
         notebookEdit: NotebookEditTool,
         notebookExecute: NotebookExecuteTool,
       }).pipe(Effect.provideService(Notebook.Service, notebook))
-      return { recall, managerModels, memory, save, manager, process, chart, image, terminal, notify, send, ...tools }
+      return { recall, managerModels, memory, save, manager, process, chart, image, terminal, notify, send, getGoal, createGoal, updateGoal, ...tools }
     })
   }
 
@@ -108,6 +112,9 @@ export namespace KiloToolRegistry {
       terminal?: Tool.Info
       notify: Tool.Info
       send: Tool.Info
+      getGoal?: Tool.Info
+      createGoal?: Tool.Info
+      updateGoal?: Tool.Info
       notebookRead?: Tool.Info
       notebookEdit?: Tool.Info
       notebookExecute?: Tool.Info
@@ -129,6 +136,14 @@ export namespace KiloToolRegistry {
         send: Tool.init(tools.send),
       })
       const terminal = tools.terminal ? yield* Tool.init(tools.terminal) : undefined
+      const goal =
+        tools.getGoal && tools.createGoal && tools.updateGoal
+          ? yield* Effect.all({
+              getGoal: Tool.init(tools.getGoal),
+              createGoal: Tool.init(tools.createGoal),
+              updateGoal: Tool.init(tools.updateGoal),
+            })
+          : {}
       const notebooks =
         tools.notebookRead && tools.notebookEdit && tools.notebookExecute
           ? yield* Effect.all({
@@ -138,7 +153,7 @@ export namespace KiloToolRegistry {
             })
           : {}
       const semantic = yield* semanticTool(deps, loaders)
-      return { ...base, terminal, ...notebooks, semantic, notify: base.notify, send: base.send }
+      return { ...base, terminal, ...goal, ...notebooks, semantic, notify: base.notify, send: base.send }
     })
   }
 
@@ -202,6 +217,9 @@ export namespace KiloToolRegistry {
       terminal?: Tool.Def
       notify: Tool.Def
       send: Tool.Def
+      getGoal?: Tool.Def
+      createGoal?: Tool.Def
+      updateGoal?: Tool.Def
       notebookRead?: Tool.Def
       notebookEdit?: Tool.Def
       notebookExecute?: Tool.Def
@@ -227,6 +245,9 @@ export namespace KiloToolRegistry {
         : []),
       tools.notify,
       tools.send,
+      ...(tools.getGoal ? [tools.getGoal] : []),
+      ...(tools.createGoal ? [tools.createGoal] : []),
+      ...(tools.updateGoal ? [tools.updateGoal] : []),
     ]
   }
 

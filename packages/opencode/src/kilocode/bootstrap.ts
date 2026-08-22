@@ -21,6 +21,8 @@ import { KiloToolRegistry } from "@/kilocode/tool/registry"
 import { LayerNode } from "@opencode-ai/core/effect/layer-node"
 import { KilocodeWatcher } from "@/kilocode/watcher"
 import { AppNodeBuilder } from "@opencode-ai/core/effect/app-node-builder" // kilocode_change
+import { KiloSession } from "@/kilocode/session" // kilocode_change
+import { SessionID } from "@/session/schema" // kilocode_change
 
 const log = Log.create({ service: "kilocode-bootstrap" })
 
@@ -55,6 +57,14 @@ export namespace KilocodeBootstrap {
         yield* bus.subscribeCallback(MemoryEvents.Updated, (evt) =>
           KiloToolRegistry.invalidateMemoryEnabled(evt.properties.directory),
         )
+        // kilocode_change start - goal harness idle self-start
+        yield* bus.subscribeCallback(KiloSession.Event.TurnClose, (evt) => {
+          const sessionID = SessionID.make(evt.properties.sessionID)
+          void import("@/kilocode/goal/driver").then((mod) =>
+            mod.driveGoal(sessionID).catch((err) => log.warn("goal driver failed", { sessionID, err })),
+          )
+        })
+        // kilocode_change end
         // Session export bootstrap.
         yield* Effect.gen(function* () {
           if (!SessionExport.enabled) return
