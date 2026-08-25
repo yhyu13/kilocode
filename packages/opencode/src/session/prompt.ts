@@ -6,7 +6,7 @@ import fs from "node:fs" // kilocode_change
 import { SessionV1 } from "@opencode-ai/core/v1/session"
 import os from "os"
 import { KiloSessionPrompt } from "@/kilocode/session/prompt" // kilocode_change
-import { SKILL_SHELL_DISABLED, SKILL_SHELL_UNTRUSTED } from "@/kilocode/skills/display" // kilocode_change
+import { SkillSlash } from "@/kilocode/skills/slash" // kilocode_change
 import { KiloSessionMessageOrder } from "@/kilocode/session/message-order" // kilocode_change
 import { KiloSessionPromptQueue } from "@/kilocode/session/prompt-queue" // kilocode_change
 import { KiloSession } from "@/kilocode/session" // kilocode_change
@@ -2357,16 +2357,19 @@ export const layer = Layer.effect(
         template = template + "\n\n" + input.arguments
       }
 
+      // kilocode_change start - consecutive /skill tokens inject every matching skill in one turn
+      if (cmd.source === "skill") {
+        template = yield* SkillSlash.render({
+          cmd,
+          arguments: input.arguments,
+          disabled: flags.disableSkillShell,
+          get: (name) => commands.get(name),
+        })
+      }
+      // kilocode_change end
+
       const shellMatches = ConfigMarkdown.shell(template)
-      // kilocode_change start - skill templates run !`cmd`` only when trusted and the kill-switch is off,
-      // mirroring the skill tool's gate (the slash-command path is user-initiated, so it is not prompted).
-      const skillTemplate = cmd.source === "skill"
-      const skillShellBlocked = skillTemplate && (cmd.trusted !== true || flags.disableSkillShell)
-      if (shellMatches.length > 0 && skillShellBlocked) {
-        const note = cmd.trusted !== true ? SKILL_SHELL_UNTRUSTED : SKILL_SHELL_DISABLED
-        template = template.replace(bashRegex, () => note)
-      } else if (shellMatches.length > 0) {
-        // kilocode_change end
+      if (shellMatches.length > 0) {
         const cfg = yield* config.get()
         const sh = Shell.preferred(cfg.shell)
         // kilocode_change start

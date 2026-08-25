@@ -253,6 +253,16 @@ Skills are re-scanned at the start of each new session. To pick up newly added o
 {% /tab %}
 {% /tabs %}
 
+## Invoking skills
+
+Type `/skill-name` in chat to inject a skill into the current turn. Consecutive skill slash tokens inject every matching skill in one turn:
+
+```
+/goal-persistence /tdd
+```
+
+If a skill shares a name with a slash command, use `/name:skill`. Remaining text after the last consecutive skill is appended after the injected skills. When only one skill is invoked, leftover text is passed as that skill's arguments.
+
 ## SKILL.md Format
 
 The `SKILL.md` file uses YAML frontmatter followed by Markdown content containing the instructions:
