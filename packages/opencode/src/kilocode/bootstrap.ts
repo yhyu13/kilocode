@@ -61,7 +61,7 @@ export namespace KilocodeBootstrap {
         yield* bus.subscribeCallback(KiloSession.Event.TurnClose, (evt) => {
           const sessionID = SessionID.make(evt.properties.sessionID)
           void import("@/kilocode/goal/driver").then((mod) =>
-            mod.driveGoal(sessionID).catch((err) => log.warn("goal driver failed", { sessionID, err })),
+            mod.driveGoal(sessionID, evt.properties.reason).catch((err) => log.warn("goal driver failed", { sessionID, err })),
           )
         })
         // kilocode_change end

@@ -10,6 +10,7 @@ import { GoalId, type GoalBlockReason, type GoalView } from "./types"
 import { GoalService } from "./service"
 import { resolveConfig } from "./config"
 import { goalWrapupPrompt } from "./prompt"
+import { directHuman, isGoalRound } from "./authority"
 
 type GoalValue =
   | { goal: null }
@@ -44,16 +45,12 @@ function value(goal: GoalView | undefined): GoalValue {
   }
 }
 
-function directHuman(ctx: Tool.Context): boolean {
-  const lastUser = ctx.messages.findLast((msg) => msg.info.role === "user")
-  return lastUser?.parts.some((part) => part.type === "text" && !("synthetic" in part && part.synthetic)) ?? false
+function humanTurn(ctx: Tool.Context): boolean {
+  return directHuman(ctx.messages)
 }
 
 function goalRound(ctx: Tool.Context): boolean {
-  const lastUser = ctx.messages.findLast((msg) => msg.info.role === "user")
-  return lastUser?.parts.some(
-    (part) => part.type === "text" && part.text.includes("<goal_round>"),
-  ) ?? false
+  return isGoalRound(ctx.messages)
 }
 
 function ref(goalID: string, revision: number) {
@@ -102,7 +99,7 @@ export const CreateGoalTool = Tool.define<typeof CreateParams, GoalMeta, never>(
     parameters: CreateParams,
     execute: (args: Schema.Schema.Type<typeof CreateParams>, ctx: Tool.Context) =>
       Effect.gen(function* () {
-        if (!directHuman(ctx)) throw new Error("create_goal requires a direct human turn")
+        if (!humanTurn(ctx)) throw new Error("create_goal requires a direct human turn")
         const goal = yield* Effect.promise(() =>
           GoalService.create(ctx.sessionID, {
             objective: args.objective,
@@ -131,7 +128,7 @@ export const UpdateGoalTool = Tool.define<typeof UpdateParams, GoalMeta, never>(
         const phase = current?.phase
 
         if (args.action === "edit" || args.action === "pause" || args.action === "resume") {
-          if (!directHuman(ctx)) throw new Error(`${args.action} requires a direct human turn`)
+          if (!humanTurn(ctx)) throw new Error(`${args.action} requires a direct human turn`)
         }
 
         let goal: GoalView | undefined
@@ -147,7 +144,7 @@ export const UpdateGoalTool = Tool.define<typeof UpdateParams, GoalMeta, never>(
         } else if (args.action === "resume") {
           goal = yield* Effect.promise(() => GoalService.resume(ctx.sessionID, expected.id, expected.revision))
         } else if (args.action === "complete") {
-          if (!directHuman(ctx) && !goalRound(ctx)) {
+          if (!humanTurn(ctx) && !goalRound(ctx)) {
             throw new Error("complete requires a direct human turn or the current goal round")
           }
           goal = yield* Effect.promise(() => GoalService.complete(ctx.sessionID, expected.id, expected.revision))
@@ -156,13 +153,13 @@ export const UpdateGoalTool = Tool.define<typeof UpdateParams, GoalMeta, never>(
           if (blocked === undefined || blocked.trim().length === 0) {
             throw new Error("blocked_reason is required with action blocked")
           }
-          if (!directHuman(ctx) && !goalRound(ctx)) {
+          if (!humanTurn(ctx) && !goalRound(ctx)) {
             throw new Error("blocked requires a direct human turn or the current goal round")
           }
           if (goalRound(ctx) && phase === "active"
             && (current?.roundsStarted ?? 0) < resolveConfig().blockedAfterConsecutiveRounds) {
             throw new Error(
-              `blocked requires at least ${resolveConfig().blockedAfterConsecutiveRounds} consecutive goal rounds`,
+              `blocked requires at least ${resolveConfig().blockedAfterConsecutiveRounds} started goal rounds (round floor, not a same-condition streak)`,
             )
           }
           goal = yield* Effect.promise(() =>

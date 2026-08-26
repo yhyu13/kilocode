@@ -14,7 +14,7 @@ const GOAL_TEMPLATE = [
   "- pause / resume / complete / blocked: call update_goal with the exact id and revision from get_goal.",
   "- edit: call update_goal with action edit and the replacement objective and/or max_goal_rounds.",
   "",
-  "Mark complete only when the objective is actually achieved. Mark blocked only after the same blocking condition persists across consecutive rounds.",
+  "Mark complete only when the objective is actually achieved. Mark blocked only after at least the configured number of goal rounds have started (a round floor, not a same-condition streak).",
 ].join("\n")
 
 export function goalCommand(): Command.Info {

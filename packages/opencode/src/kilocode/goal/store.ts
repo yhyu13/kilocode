@@ -36,10 +36,25 @@ interface Row {
 
 const PHASES: readonly GoalPhase[] = ["active", "paused", "blocked", "complete"]
 
+const CREATE_TABLE = sql`
+  CREATE TABLE IF NOT EXISTS kilo_goal (
+    session_id TEXT PRIMARY KEY,
+    id TEXT NOT NULL,
+    revision INTEGER NOT NULL,
+    objective TEXT NOT NULL,
+    phase TEXT NOT NULL,
+    blocked_reason TEXT,
+    max_rounds INTEGER NOT NULL,
+    rounds_started INTEGER NOT NULL,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL
+  )
+`
+
 function parseRow(row: Row): GoalView {
   const blockedReason = row.blocked_reason === null
     ? undefined
-    : (JSON.parse(row.blocked_reason) as GoalBlockReason)
+    : normalizeBlockReason(JSON.parse(row.blocked_reason))
   return {
     id: GoalId(row.id),
     revision: row.revision,
@@ -74,20 +89,7 @@ function assertPhase(value: string): GoalPhase {
 export async function get(sessionID: string): Promise<GoalView | undefined> {
   return withDb((db) =>
     Effect.gen(function* () {
-      yield* db.run(sql`
-        CREATE TABLE IF NOT EXISTS kilo_goal (
-          session_id TEXT PRIMARY KEY,
-          id TEXT NOT NULL,
-          revision INTEGER NOT NULL,
-          objective TEXT NOT NULL,
-          phase TEXT NOT NULL,
-          blocked_reason TEXT,
-          max_rounds INTEGER NOT NULL,
-          rounds_started INTEGER NOT NULL,
-          created_at INTEGER NOT NULL,
-          updated_at INTEGER NOT NULL
-        )
-      `)
+      yield* db.run(CREATE_TABLE)
       const row = yield* db.get<Row>(sql`
         SELECT * FROM kilo_goal WHERE session_id = ${sessionID}
       `)
@@ -106,26 +108,16 @@ export async function create(
   return withDb((db) =>
     db.transaction((tx) =>
       Effect.gen(function* () {
-        yield* tx.run(sql`
-          CREATE TABLE IF NOT EXISTS kilo_goal (
-            session_id TEXT PRIMARY KEY,
-            id TEXT NOT NULL,
-            revision INTEGER NOT NULL,
-            objective TEXT NOT NULL,
-            phase TEXT NOT NULL,
-            blocked_reason TEXT,
-            max_rounds INTEGER NOT NULL,
-            rounds_started INTEGER NOT NULL,
-            created_at INTEGER NOT NULL,
-            updated_at INTEGER NOT NULL
-          )
-        `)
+        yield* tx.run(CREATE_TABLE)
         const row = yield* tx.get<Row>(sql`
           SELECT * FROM kilo_goal WHERE session_id = ${sessionID}
         `)
         const current = row ? parseRow(row) : undefined
         if (current && current.phase !== "complete") {
           throw new Error(`goal already exists with phase "${current.phase}"`)
+        }
+        if (current) {
+          yield* tx.run(sql`DELETE FROM kilo_goal WHERE session_id = ${sessionID}`)
         }
         const objective = normalizeObjective(input.objective)
         const maxRounds = normalizeMaxRounds(input.maxRounds ?? defaults.defaultMaxRounds)
@@ -165,11 +157,15 @@ export async function edit(
     if (input.objective === undefined && input.maxRounds === undefined) {
       throw new TypeError("goal edit requires objective and/or maxRounds")
     }
+    const maxRounds = input.maxRounds !== undefined ? normalizeMaxRounds(input.maxRounds) : current.maxRounds
+    if (maxRounds < current.roundsStarted) {
+      throw new Error("maxRounds cannot be below rounds already started")
+    }
     return {
       ...snapshotFromView(current),
       revision: current.revision + 1,
       ...(input.objective !== undefined ? { objective: normalizeObjective(input.objective) } : {}),
-      ...(input.maxRounds !== undefined ? { maxRounds: normalizeMaxRounds(input.maxRounds) } : {}),
+      maxRounds,
     }
   })
 }
@@ -250,14 +246,14 @@ function mutate(
             rounds_started = ${roundsStarted},
             updated_at = ${now}
           WHERE session_id = ${sessionID}
+            AND id = ${expected.id}
+            AND revision = ${expected.revision}
         `)
-        return {
-          ...next,
-          roundsStarted,
-          createdAt: current.createdAt,
-          updatedAt: now,
-          armed: false,
-        } satisfies GoalView
+        const written = yield* tx.get<Row>(sql`
+          SELECT * FROM kilo_goal WHERE session_id = ${sessionID} AND id = ${expected.id} AND revision = ${next.revision}
+        `)
+        if (!written) throw new Error("stale goal ref; update did not apply")
+        return parseRow(written)
       }),
       { behavior: "immediate" },
     ),

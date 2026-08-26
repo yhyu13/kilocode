@@ -4,6 +4,8 @@ import { normalizeObjective, normalizeMaxRounds, normalizeBlockReason, GoalId } 
 import { resolveConfig } from "@/kilocode/goal/config"
 import { GoalService } from "@/kilocode/goal/service"
 import { goalCommand } from "@/kilocode/goal/command"
+import { closeReasonDecision, createDriveLock, evaluateDrive } from "@/kilocode/goal/admission"
+import { directHuman, isGoalRound } from "@/kilocode/goal/authority"
 import { KiloToolRegistry } from "@/kilocode/tool/registry"
 import type * as Tool from "@/tool/tool"
 import { Effect } from "effect"
@@ -61,6 +63,82 @@ describe("goal config", () => {
     const cfg = resolveConfig()
     expect(cfg.defaultMaxRounds).toBeGreaterThan(0)
     expect(cfg.blockedAfterConsecutiveRounds).toBeGreaterThan(0)
+  })
+
+  test("illegal env throws at load", () => {
+    const prev = process.env["KILO_GOAL_MAX_ROUNDS"]
+    process.env["KILO_GOAL_MAX_ROUNDS"] = "0"
+    try {
+      expect(() => resolveConfig()).toThrow(/KILO_GOAL_MAX_ROUNDS/)
+    } finally {
+      if (prev === undefined) delete process.env["KILO_GOAL_MAX_ROUNDS"]
+      else process.env["KILO_GOAL_MAX_ROUNDS"] = prev
+    }
+  })
+})
+
+describe("goal admission", () => {
+  test("completed and omitted evaluate", () => {
+    expect(closeReasonDecision("completed")).toEqual({ action: "evaluate" })
+    expect(closeReasonDecision(undefined)).toEqual({ action: "evaluate" })
+  })
+
+  test("error and interrupted disarm", () => {
+    expect(closeReasonDecision("error")).toEqual({ action: "disarm" })
+    expect(closeReasonDecision("interrupted")).toEqual({ action: "disarm" })
+  })
+
+  test("superseded skips without disarm", () => {
+    expect(closeReasonDecision("superseded")).toEqual({ action: "skip" })
+  })
+
+  test("evaluateDrive admits only idle active armed with remaining rounds", () => {
+    expect(evaluateDrive({ idleType: "busy", phase: "active", armed: true, roundsStarted: 0, maxRounds: 2 })).toEqual({
+      action: "skip",
+    })
+    expect(evaluateDrive({ idleType: "idle", phase: "paused", armed: true, roundsStarted: 0, maxRounds: 2 })).toEqual({
+      action: "skip",
+    })
+    expect(evaluateDrive({ idleType: "idle", phase: "active", armed: false, roundsStarted: 0, maxRounds: 2 })).toEqual({
+      action: "skip",
+    })
+    expect(evaluateDrive({ idleType: "idle", phase: "active", armed: true, roundsStarted: 2, maxRounds: 2 })).toEqual({
+      action: "block-round-limit",
+    })
+    expect(evaluateDrive({ idleType: "idle", phase: "active", armed: true, roundsStarted: 1, maxRounds: 2 })).toEqual({
+      action: "admit",
+    })
+  })
+
+  test("drive lock queues one pending slot and last reason wins", () => {
+    const lock = createDriveLock()
+    expect(lock.begin("ses", "completed")).toBe("enter")
+    expect(lock.begin("ses", "completed")).toBe("queued")
+    expect(lock.begin("ses", "interrupted")).toBe("queued")
+    expect(lock.isDriving("ses")).toBe(true)
+    expect(lock.end("ses")).toEqual({ reason: "interrupted" })
+    expect(lock.isDriving("ses")).toBe(false)
+    expect(lock.end("ses")).toBeUndefined()
+  })
+})
+
+describe("goal authority", () => {
+  test("direct human is non-synthetic user text", () => {
+    expect(
+      directHuman([{ info: { role: "user" }, parts: [{ type: "text", text: "go", synthetic: false }] }]),
+    ).toBe(true)
+    expect(
+      directHuman([{ info: { role: "user" }, parts: [{ type: "text", text: "<goal_round>", synthetic: true }] }]),
+    ).toBe(false)
+  })
+
+  test("quoted goal_round tag in human text is not a goal round", () => {
+    expect(
+      isGoalRound([{ info: { role: "user" }, parts: [{ type: "text", text: "see <goal_round>", synthetic: false }] }]),
+    ).toBe(false)
+    expect(
+      isGoalRound([{ info: { role: "user" }, parts: [{ type: "text", text: "<goal_round>", synthetic: true }] }]),
+    ).toBe(true)
   })
 })
 
@@ -131,6 +209,35 @@ describe("goal service", () => {
     await GoalService.clear(session)
     expect(await GoalService.get(session)).toBeUndefined()
     expect(GoalService.isArmed(created.id)).toBe(false)
+  })
+
+  test("create after complete replaces the row", async () => {
+    const session = "goal-create-after-complete"
+    const first = await GoalService.create(session, { objective: "first" })
+    await GoalService.complete(session, first.id, first.revision)
+    const second = await GoalService.create(session, { objective: "second" })
+    expect(second.objective).toBe("second")
+    expect(second.id).not.toBe(first.id)
+    expect(second.phase).toBe("active")
+    expect(second.revision).toBe(1)
+    expect(second.armed).toBe(true)
+  })
+
+  test("complete is terminal", async () => {
+    const session = "goal-complete-terminal"
+    const created = await GoalService.create(session, { objective: "ship it" })
+    const done = await GoalService.complete(session, created.id, created.revision)
+    await expect(GoalService.pause(session, done.id, done.revision)).rejects.toThrow()
+    await expect(GoalService.resume(session, done.id, done.revision)).rejects.toThrow()
+  })
+
+  test("edit rejects maxRounds below rounds already started", async () => {
+    const session = "goal-edit-maxrounds"
+    await GoalService.create(session, { objective: "ship it", maxRounds: 3 })
+    await GoalService.admitRound(session)
+    const second = await GoalService.admitRound(session)
+    expect(second?.roundsStarted).toBe(2)
+    await expect(GoalService.edit(session, second!.id, second!.revision, { maxRounds: 1 })).rejects.toThrow()
   })
 })
 

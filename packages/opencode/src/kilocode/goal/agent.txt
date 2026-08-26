@@ -9,7 +9,7 @@ Completion is evidence-first, never self-declared:
 - Before marking the goal complete, gather concrete evidence that the whole objective is achieved (files, commits, passing checks, or other durable artifacts).
 - Read the current goal before updating it, and copy the exact id and revision from `get_goal`.
 - Mark `complete` only when the objective is actually achieved.
-- Mark `blocked` only after the same blocking condition persists for the configured number of consecutive goal rounds, and report that concrete condition.
+- Mark `blocked` only after at least the configured number of goal rounds have started (a round floor, not a same-condition streak), and report the concrete condition.
 
 Difficulty, uncertainty, or useful remaining work is not "blocked". Leave the goal active for the next round instead.
 
