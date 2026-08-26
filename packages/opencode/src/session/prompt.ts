@@ -2332,6 +2332,17 @@ export const layer = Layer.effect(
       }
       // kilocode_change end
 
+      // kilocode_change start - consecutive /skill tokens inject every matching skill in one turn
+      let template = cmd.source === "skill"
+        ? yield* SkillSlash.render({
+          cmd,
+          arguments: input.arguments,
+          disabled: flags.disableSkillShell,
+          get: (name) => commands.get(name),
+        })
+        : ""
+      if (cmd.source !== "skill") {
+      // kilocode_change end
       const raw = input.arguments.match(argsRegex) ?? []
       const args = raw.map((arg) => arg.replace(quoteTrimRegex, ""))
       const templateCommand = yield* Effect.promise(async () => cmd.template)
@@ -2351,22 +2362,12 @@ export const layer = Layer.effect(
         return args[argIndex]
       })
       const usesArgumentsPlaceholder = templateCommand.includes("$ARGUMENTS")
-      let template = withArgs.replaceAll("$ARGUMENTS", input.arguments)
+      template = withArgs.replaceAll("$ARGUMENTS", input.arguments)
 
       if (placeholders.length === 0 && !usesArgumentsPlaceholder && input.arguments.trim()) {
         template = template + "\n\n" + input.arguments
       }
-
-      // kilocode_change start - consecutive /skill tokens inject every matching skill in one turn
-      if (cmd.source === "skill") {
-        template = yield* SkillSlash.render({
-          cmd,
-          arguments: input.arguments,
-          disabled: flags.disableSkillShell,
-          get: (name) => commands.get(name),
-        })
-      }
-      // kilocode_change end
+      } // kilocode_change
 
       const shellMatches = ConfigMarkdown.shell(template)
       if (shellMatches.length > 0) {

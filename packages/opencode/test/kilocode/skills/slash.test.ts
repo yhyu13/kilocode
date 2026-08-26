@@ -127,4 +127,40 @@ describe("SkillSlash.render", () => {
       expect(out).toBe(`Goal !\`printf a\`\n\nProj ${SKILL_SHELL_UNTRUSTED}`)
     }),
   )
+
+  it.effect("gates leftover shell when the kill switch is on", () =>
+    Effect.gen(function* () {
+      const out = yield* SkillSlash.render({
+        cmd: cmd("goal", "skill", "Goal."),
+        arguments: "/tdd leftover !`whoami`",
+        disabled: true,
+        get: get([cmd("tdd", "skill", "TDD.")]),
+      })
+      expect(out).toBe(`Goal.\n\nTDD.\n\nleftover ${SKILL_SHELL_DISABLED}`)
+    }),
+  )
+
+  it.effect("gates leftover shell when an extra skill is untrusted", () =>
+    Effect.gen(function* () {
+      const out = yield* SkillSlash.render({
+        cmd: cmd("goal", "skill", "Goal."),
+        arguments: "/proj leftover !`whoami`",
+        disabled: false,
+        get: get([cmd("proj", "skill", "Proj.", false)]),
+      })
+      expect(out).toBe(`Goal.\n\nProj.\n\nleftover ${SKILL_SHELL_UNTRUSTED}`)
+    }),
+  )
+
+  it.effect("leaves leftover shell live when every skill is trusted", () =>
+    Effect.gen(function* () {
+      const out = yield* SkillSlash.render({
+        cmd: cmd("goal", "skill", "Goal."),
+        arguments: "/tdd leftover !`whoami`",
+        disabled: false,
+        get: get([cmd("tdd", "skill", "TDD.")]),
+      })
+      expect(out).toBe("Goal.\n\nTDD.\n\nleftover !`whoami`")
+    }),
+  )
 })

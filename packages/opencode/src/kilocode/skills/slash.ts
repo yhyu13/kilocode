@@ -83,7 +83,10 @@ export namespace SkillSlash {
       const template = yield* Effect.promise(async () => cmd.template)
       parts.push(gate(expand(template, ""), cmd.trusted === true, input.disabled))
     }
-    if (extra.cmds.length > 0 && extra.rest) parts.push(extra.rest)
+    if (extra.cmds.length > 0 && extra.rest) {
+      const trusted = extra.cmds.every((cmd) => cmd.trusted === true) && input.cmd.trusted === true
+      parts.push(gate(extra.rest, trusted, input.disabled))
+    }
     return parts.join("\n\n")
   })
 }
