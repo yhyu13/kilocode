@@ -77,12 +77,12 @@ export async function driveGoal(sessionID: SessionID, reason?: GoalCloseReason):
     )
   } catch (err) {
     log.warn("goal round failed", { sessionID, err })
-    try {
-      const goal = await GoalService.get(sessionID)
-      if (goal) GoalService.disarm(goal.id)
-    } catch (disarmErr) {
-      log.warn("could not disarm failed goal", { sessionID, err: disarmErr })
-    }
+    await GoalService.get(sessionID).then(
+      (goal) => {
+        if (goal) GoalService.disarm(goal.id)
+      },
+      (fail) => log.warn("could not disarm failed goal", { sessionID, err: fail }),
+    )
   } finally {
     const pending = lock.end(sessionID)
     if (pending) {

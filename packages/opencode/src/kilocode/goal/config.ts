@@ -4,8 +4,11 @@
 
 function positiveInt(value: string | undefined, fallback: number, name: string): number {
   if (value === undefined) return fallback
-  const parsed = Number.parseInt(value, 10)
-  if (!Number.isSafeInteger(parsed) || parsed < 1) {
+  if (!/^[1-9]\d*$/.test(value)) {
+    throw new TypeError(`${name} must be a positive safe integer`)
+  }
+  const parsed = Number(value)
+  if (!Number.isSafeInteger(parsed)) {
     throw new TypeError(`${name} must be a positive safe integer`)
   }
   return parsed

@@ -66,13 +66,26 @@ describe("goal config", () => {
   })
 
   test("illegal env throws at load", () => {
-    const prev = process.env["KILO_GOAL_MAX_ROUNDS"]
-    process.env["KILO_GOAL_MAX_ROUNDS"] = "0"
+    const prevMax = process.env["KILO_GOAL_MAX_ROUNDS"]
+    const prevBlocked = process.env["KILO_GOAL_BLOCKED_AFTER"]
+    const restore = () => {
+      if (prevMax === undefined) delete process.env["KILO_GOAL_MAX_ROUNDS"]
+      else process.env["KILO_GOAL_MAX_ROUNDS"] = prevMax
+      if (prevBlocked === undefined) delete process.env["KILO_GOAL_BLOCKED_AFTER"]
+      else process.env["KILO_GOAL_BLOCKED_AFTER"] = prevBlocked
+    }
     try {
+      process.env["KILO_GOAL_MAX_ROUNDS"] = "0"
       expect(() => resolveConfig()).toThrow(/KILO_GOAL_MAX_ROUNDS/)
+      process.env["KILO_GOAL_MAX_ROUNDS"] = "1.5"
+      expect(() => resolveConfig()).toThrow(/KILO_GOAL_MAX_ROUNDS/)
+      process.env["KILO_GOAL_MAX_ROUNDS"] = "12abc"
+      expect(() => resolveConfig()).toThrow(/KILO_GOAL_MAX_ROUNDS/)
+      delete process.env["KILO_GOAL_MAX_ROUNDS"]
+      process.env["KILO_GOAL_BLOCKED_AFTER"] = "0"
+      expect(() => resolveConfig()).toThrow(/KILO_GOAL_BLOCKED_AFTER/)
     } finally {
-      if (prev === undefined) delete process.env["KILO_GOAL_MAX_ROUNDS"]
-      else process.env["KILO_GOAL_MAX_ROUNDS"] = prev
+      restore()
     }
   })
 })
