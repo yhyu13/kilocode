@@ -4,17 +4,17 @@
 
 ## 标题
 
-给 Agent 加长期目标：进展可以记住，开机不准自己跑
+给 Agent 加长期目标：进度能留下，重启后别自己接着干
 
 ## 导语
 
-长跑目标是探针，压的是 Agent Harness 的生命周期、权限和验收，不是模型记性。状态可回放，权限必须重授。
+这篇不是再做一个待办。它用长期目标当探针，压一遍 Agent Harness：新能力能不能接上、不拆发动机。进度能留下，重启后别自己接着干。
 
-正文结构：标题下 TL;DR → 错路/脉络/树 → 收获和结论 → PS / PPS / PPPS。
+正文结构：标题下 TL;DR → **为什么（正文第一块）** → 错路/脉络/树 → 收获和结论 → PS / PPS / PPPS。
 
-## 配图上传顺序（13 张）
+## 配图上传顺序（12 张）
 
-1. `images/12-why.png` — 长跑压的是 Harness，不是模型
+1. `images/12-why.png` — 为什么：六条 Harness 承诺
 2. `images/09-wrong-loop.png` — 错路 / 正路
 3. `images/00-thread.png` — 逻辑脉络
 4. `images/01-tree.png` — 整棵树
@@ -25,10 +25,7 @@
 9. `images/05-authority.png` — 谁能改
 10. `images/07-round.png` — 一次一续
 11. `images/10-evidence.png` — 证据先行
-12. `images/03-branches.png` — 四根分支各归一处
-13. `images/11-takeaway.png` — 收获七条
-
-`images/02-is-not.png` 是上一稿的总对照表，正文不再引用；粘贴时不必上传。
+12. `images/11-takeaway.png` — 收获七条
 
 正文里的 `![…](images/….png)` 粘贴后不会自动带上本地文件；在对应位置插入刚上传的图即可。
 
