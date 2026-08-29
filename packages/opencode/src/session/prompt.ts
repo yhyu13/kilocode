@@ -6,6 +6,7 @@ import fs from "node:fs" // kilocode_change
 import { SessionV1 } from "@opencode-ai/core/v1/session"
 import os from "os"
 import { KiloSessionPrompt } from "@/kilocode/session/prompt" // kilocode_change
+import { KiloPromptMinTokens } from "@/kilocode/session/prompt-min-tokens" // kilocode_change
 import { SkillSlash } from "@/kilocode/skills/slash" // kilocode_change
 import { KiloSessionMessageOrder } from "@/kilocode/session/message-order" // kilocode_change
 import { KiloSessionPromptQueue } from "@/kilocode/session/prompt-queue" // kilocode_change
@@ -1398,7 +1399,20 @@ export const layer = Layer.effect(
         yield* KiloSessionPrompt.recoverDanglingAssistant({ sessionID: input.sessionID, status, sessions })
         yield* KiloSessionPrompt.recoverProviderFinishError({ sessionID: input.sessionID, status, sessions })
         // kilocode_change end
-        const message = yield* KiloSessionPrompt.intake(input.sessionID, createUserMessage(input)) // kilocode_change
+        // kilocode_change start - enforce minimum prompt length before the shallow prompt reaches the model
+        const guardedParts = yield* KiloPromptMinTokens.enforce({
+          config,
+          events,
+          sessionID: input.sessionID,
+          parts: input.parts,
+          session,
+          noReply: input.noReply,
+        })
+        // kilocode_change end
+        const message = yield* KiloSessionPrompt.intake(
+          input.sessionID,
+          createUserMessage({ ...input, parts: guardedParts }),
+        ) // kilocode_change
         yield* sessions.touch(input.sessionID)
 
         const permissions: PermissionV1.Rule[] = []

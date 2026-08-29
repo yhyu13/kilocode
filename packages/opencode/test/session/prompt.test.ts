@@ -301,6 +301,10 @@ const unixNoLLMServer = process.platform !== "win32" ? noLLMServer.instance : no
 // Config that registers a custom "test" provider with a "test-model" model
 // so provider model lookup succeeds inside the loop.
 const cfg = {
+  // kilocode_change start - disable the prompt min-token guard in these shared
+  // session-mechanics tests; short fixtures must reach the mock LLM untouched.
+  experimental: { prompt_min_tokens: false },
+  // kilocode_change end
   provider: {
     test: {
       name: "Test",

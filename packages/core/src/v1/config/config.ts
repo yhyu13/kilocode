@@ -330,6 +330,23 @@ export const Info = Schema.Struct({
         description:
           "Additional filesystem paths the sandbox allows writes to (e.g. ['/tmp', '/var/log']). These are merged with the default writable paths when the sandbox is active.",
       }),
+      // kilocode_change start
+      prompt_min_tokens: Schema.optional(
+        Schema.Union([
+          Schema.Boolean,
+          Schema.Struct({
+            min_tokens: Schema.optional(PositiveInt).annotate({
+              description: "Minimum token count before a prompt is considered substantive (default: 100).",
+            }),
+            action: Schema.optional(Schema.Literals(["enrich", "reject"])).annotate({
+              description: "What to do with a short prompt: enrich it via a small model, or reject it (default: enrich).",
+            }),
+          }),
+        ]),
+      ).annotate({
+        description:
+          "Guard against shallow prompts. Prompts below the minimum token count are enriched or rejected before reaching the model (default: enabled, 100 tokens, enrich). Set false to disable.",
+      }),
       // kilocode_change end
       mcp_timeout: Schema.optional(PositiveInt).annotate({
         description: "Timeout in milliseconds for model context protocol (MCP) requests",
