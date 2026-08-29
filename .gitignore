@@ -75,3 +75,7 @@ packages/*/.kilo/tui.jsonc
 # Test Artifacts
 packages/app/.artifacts/
 packages/opencode/.artifacts/
+
+# OpenWolf runtime state + Playwright MCP artifacts (machine-local, not committed)
+.wolf/
+.playwright-mcp/
